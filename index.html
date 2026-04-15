@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>London Borough Happiness &amp; Puppy Index</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f0f2f5; }
+  #map { width: 100%; height: 100vh; }
+
+  .legend {
+    background: white;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    line-height: 1.6;
+    max-width: 220px;
+    font-size: 13px;
+  }
+  .legend h4 {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #1a1a2e;
+    font-weight: 700;
+  }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .legend-color {
+    width: 20px; height: 14px; border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0;
+  }
+  .legend-label { color: #444; font-size: 12px; }
+
+  .info-panel {
+    background: white;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    max-width: 260px;
+    font-size: 13px;
+  }
+  .info-panel h4 {
+    font-size: 15px;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .info-panel .stat { color: #555; margin-bottom: 3px; }
+  .info-panel .hint { color: #999; font-size: 11px; margin-top: 8px; font-style: italic; }
+
+  .puppy-popup {
+    text-align: center;
+    min-width: 240px;
+  }
+  .puppy-popup h3 {
+    font-size: 15px;
+    margin-bottom: 8px;
+    color: #1a1a2e;
+    font-weight: 700;
+  }
+  .puppy-popup img {
+    width: 220px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto 8px;
+    background: #eee;
+  }
+  .puppy-popup .stats {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+  }
+  .puppy-popup .loading {
+    width: 220px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+    border-radius: 8px;
+    color: #999;
+    font-size: 13px;
+    margin: 0 auto 8px;
+  }
+  .puppy-popup .error {
+    color: #c0392b;
+    font-size: 12px;
+  }
+  .puppy-popup .new-puppy-btn {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 5px 14px;
+    background: #6c5ce7;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .puppy-popup .new-puppy-btn:hover { background: #5a4bd1; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+// London Borough data: name, happiness score (1-10), puppy ownership rate (%)
+// Fictional but plausible data for visualization purposes
+const boroughData = {
+  "City of London": { happiness: 6.2, puppyRate: 3.1 },
+  "Barking and Dagenham": { happiness: 5.8, puppyRate: 18.5 },
+  "Barnet": { happiness: 7.1, puppyRate: 22.4 },
+  "Bexley": { happiness: 6.9, puppyRate: 24.1 },
+  "Brent": { happiness: 6.3, puppyRate: 14.2 },
+  "Bromley": { happiness: 7.4, puppyRate: 27.3 },
+  "Camden": { happiness: 6.8, puppyRate: 11.5 },
+  "Croydon": { happiness: 6.5, puppyRate: 19.8 },
+  "Ealing": { happiness: 6.7, puppyRate: 16.3 },
+  "Enfield": { happiness: 6.6, puppyRate: 20.1 },
+  "Greenwich": { happiness: 6.9, puppyRate: 17.6 },
+  "Hackney": { happiness: 6.4, puppyRate: 12.8 },
+  "Hammersmith and Fulham": { happiness: 7.0, puppyRate: 15.4 },
+  "Haringey": { happiness: 6.3, puppyRate: 13.1 },
+  "Harrow": { happiness: 7.2, puppyRate: 21.7 },
+  "Havering": { happiness: 7.0, puppyRate: 26.5 },
+  "Hillingdon": { happiness: 6.8, puppyRate: 23.2 },
+  "Hounslow": { happiness: 6.5, puppyRate: 15.9 },
+  "Islington": { happiness: 6.6, puppyRate: 9.7 },
+  "Kensington and Chelsea": { happiness: 7.3, puppyRate: 14.8 },
+  "Kingston upon Thames": { happiness: 7.5, puppyRate: 25.6 },
+  "Lambeth": { happiness: 6.4, puppyRate: 11.2 },
+  "Lewisham": { happiness: 6.5, puppyRate: 14.5 },
+  "Merton": { happiness: 7.1, puppyRate: 20.9 },
+  "Newham": { happiness: 5.9, puppyRate: 10.3 },
+  "Redbridge": { happiness: 6.7, puppyRate: 19.4 },
+  "Richmond upon Thames": { happiness: 7.8, puppyRate: 28.9 },
+  "Southwark": { happiness: 6.5, puppyRate: 12.1 },
+  "Sutton": { happiness: 7.2, puppyRate: 24.8 },
+  "Tower Hamlets": { happiness: 6.1, puppyRate: 8.4 },
+  "Waltham Forest": { happiness: 6.5, puppyRate: 15.7 },
+  "Wandsworth": { happiness: 7.0, puppyRate: 17.2 },
+  "Westminster": { happiness: 6.7, puppyRate: 10.6 }
+};
+
+// Compute the happiness-puppy index: normalized combination of both metrics
+// Index = 0.5 * normalizedHappiness + 0.5 * normalizedPuppyRate
+const happinessValues = Object.values(boroughData).map(d => d.happiness);
+const puppyValues = Object.values(boroughData).map(d => d.puppyRate);
+const hMin = Math.min(...happinessValues), hMax = Math.max(...happinessValues);
+const pMin = Math.min(...puppyValues), pMax = Math.max(...puppyValues);
+
+for (const [name, d] of Object.entries(boroughData)) {
+  const hNorm = (d.happiness - hMin) / (hMax - hMin);
+  const pNorm = (d.puppyRate - pMin) / (pMax - pMin);
+  d.index = 0.5 * hNorm + 0.5 * pNorm;
+}
+
+// Color scale: low (cool blue) → mid (yellow-green) → high (warm pink/coral)
+function indexToColor(index) {
+  const stops = [
+    { pos: 0.0, r: 69, g: 123, b: 157 },
+    { pos: 0.25, r: 87, g: 171, b: 164 },
+    { pos: 0.5, r: 170, g: 207, b: 119 },
+    { pos: 0.75, r: 248, g: 194, b: 92 },
+    { pos: 1.0, r: 235, g: 94, b: 107 }
+  ];
+  let lower = stops[0], upper = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (index >= stops[i].pos && index <= stops[i + 1].pos) {
+      lower = stops[i];
+      upper = stops[i + 1];
+      break;
+    }
+  }
+  const t = (upper.pos === lower.pos) ? 0 : (index - lower.pos) / (upper.pos - lower.pos);
+  const r = Math.round(lower.r + t * (upper.r - lower.r));
+  const g = Math.round(lower.g + t * (upper.g - lower.g));
+  const b = Math.round(lower.b + t * (upper.b - lower.b));
+  return `rgb(${r},${g},${b})`;
+}
+
+// Initialize map
+const map = L.map('map', {
+  center: [51.505, -0.09],
+  zoom: 10,
+  minZoom: 9,
+  maxZoom: 16,
+  zoomControl: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 20
+}).addTo(map);
+
+// Info panel (top-right)
+const info = L.control({ position: 'topright' });
+info.onAdd = function () {
+  this._div = L.DomUtil.create('div', 'info-panel');
+  this.update();
+  return this._div;
+};
+info.update = function (props) {
+  if (props) {
+    const d = boroughData[props.name] || {};
+    this._div.innerHTML = `
+      <h4>${props.name}</h4>
+      <div class="stat">Happiness Score: <strong>${d.happiness?.toFixed(1) ?? '—'}</strong> / 10</div>
+      <div class="stat">Puppy Ownership: <strong>${d.puppyRate?.toFixed(1) ?? '—'}%</strong></div>
+      <div class="stat">Combined Index: <strong>${(d.index * 100)?.toFixed(0) ?? '—'}%</strong></div>
+      <div class="hint">Click for a puppy!</div>`;
+  } else {
+    this._div.innerHTML = `
+      <h4>London Boroughs</h4>
+      <div class="stat">Happiness &times; Puppy Index</div>
+      <div class="hint">Hover over a borough</div>`;
+  }
+};
+info.addTo(map);
+
+// Legend (bottom-right)
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = function () {
+  const div = L.DomUtil.create('div', 'legend');
+  const grades = [
+    { label: 'Very High', val: 1.0 },
+    { label: 'High', val: 0.75 },
+    { label: 'Medium', val: 0.5 },
+    { label: 'Low', val: 0.25 },
+    { label: 'Very Low', val: 0.0 }
+  ];
+  let html = '<h4>Happiness &times; Puppy Index</h4>';
+  for (const g of grades) {
+    html += `<div class="legend-row">
+      <div class="legend-color" style="background:${indexToColor(g.val)}"></div>
+      <span class="legend-label">${g.label}</span>
+    </div>`;
+  }
+  div.innerHTML = html;
+  return div;
+};
+legend.addTo(map);
+
+// Styling
+function getStyle(feature) {
+  const name = feature.properties.name;
+  const d = boroughData[name];
+  const idx = d ? d.index : 0.5;
+  return {
+    fillColor: indexToColor(idx),
+    weight: 2,
+    opacity: 1,
+    color: 'white',
+    fillOpacity: 0.75
+  };
+}
+
+function highlightStyle() {
+  return { weight: 3, color: '#333', fillOpacity: 0.9 };
+}
+
+// Fetch puppy image
+async function fetchPuppy() {
+  const resp = await fetch('https://dog.ceo/api/breeds/image/random');
+  const data = await resp.json();
+  if (data.status === 'success') return data.message;
+  throw new Error('Failed to fetch puppy');
+}
+
+// Show puppy popup
+function showPuppyPopup(layer, name) {
+  const d = boroughData[name] || {};
+  const popupContent = document.createElement('div');
+  popupContent.className = 'puppy-popup';
+  popupContent.innerHTML = `
+    <h3>${name}</h3>
+    <div class="loading">Fetching puppy...</div>
+    <div class="stats">
+      Happiness: ${d.happiness?.toFixed(1) ?? '—'} &bull;
+      Puppies: ${d.puppyRate?.toFixed(1) ?? '—'}%
+    </div>`;
+
+  const popup = L.popup({ maxWidth: 280, minWidth: 240, className: 'puppy-leaflet-popup' })
+    .setContent(popupContent);
+  layer.bindPopup(popup).openPopup();
+
+  const loadPuppy = () => {
+    const loadingEl = popupContent.querySelector('.loading');
+    const imgEl = popupContent.querySelector('img');
+    if (loadingEl) loadingEl.style.display = 'flex';
+    if (imgEl) imgEl.style.display = 'none';
+
+    fetchPuppy().then(url => {
+      const existing = popupContent.querySelector('.loading');
+      const existingErr = popupContent.querySelector('.error');
+      if (existing) existing.remove();
+      if (existingErr) existingErr.remove();
+
+      let img = popupContent.querySelector('img');
+      if (!img) {
+        img = document.createElement('img');
+        img.alt = 'A random puppy';
+        popupContent.querySelector('h3').after(img);
+      }
+      img.src = url;
+      img.style.display = 'block';
+
+      // Add or update the "new puppy" button
+      let btn = popupContent.querySelector('.new-puppy-btn');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.className = 'new-puppy-btn';
+        btn.textContent = 'Another Puppy!';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          loadPuppy();
+        });
+        popupContent.appendChild(btn);
+      }
+
+      popup.update();
+    }).catch(() => {
+      const existing = popupContent.querySelector('.loading');
+      if (existing) existing.remove();
+      const err = document.createElement('div');
+      err.className = 'error';
+      err.textContent = 'Could not fetch puppy image.';
+      popupContent.querySelector('h3').after(err);
+      popup.update();
+    });
+  };
+
+  loadPuppy();
+}
+
+// Load GeoJSON from a public source
+let geojsonLayer;
+
+fetch('https://raw.githubusercontent.com/radoi90/housequest-data/master/london_boroughs.geojson')
+  .then(r => r.json())
+  .then(geojson => {
+    geojsonLayer = L.geoJSON(geojson, {
+      style: getStyle,
+      onEachFeature: function (feature, layer) {
+        layer.on({
+          mouseover: function (e) {
+            const l = e.target;
+            l.setStyle(highlightStyle());
+            l.bringToFront();
+            info.update({ name: feature.properties.name });
+          },
+          mouseout: function (e) {
+            geojsonLayer.resetStyle(e.target);
+            info.update();
+          },
+          click: function (e) {
+            map.fitBounds(e.target.getBounds(), { padding: [50, 50], maxZoom: 13 });
+            showPuppyPopup(e.target, feature.properties.name);
+          }
+        });
+      }
+    }).addTo(map);
+
+    map.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
+  })
+  .catch(err => {
+    console.error('Failed to load borough boundaries:', err);
+    // Fallback: try alternative source
+    fetch('https://skgrange.github.io/www/data/london_boroughs.json')
+      .then(r => r.json())
+      .then(geojson => {
+        geojsonLayer = L.geoJSON(geojson, {
+          style: getStyle,
+          onEachFeature: function (feature, layer) {
+            layer.on({
+              mouseover: function (e) {
+                const l = e.target;
+                l.setStyle(highlightStyle());
+                l.bringToFront();
+                info.update({ name: feature.properties.name });
+              },
+              mouseout: function (e) {
+                geojsonLayer.resetStyle(e.target);
+                info.update();
+              },
+              click: function (e) {
+                map.fitBounds(e.target.getBounds(), { padding: [50, 50], maxZoom: 13 });
+                showPuppyPopup(e.target, feature.properties.name);
+              }
+            });
+          }
+        }).addTo(map);
+        map.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
+      })
+      .catch(err2 => {
+        console.error('Both GeoJSON sources failed:', err2);
+        document.getElementById('map').innerHTML += '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.12);z-index:1000;text-align:center;font-family:sans-serif"><h3>Could not load borough boundaries</h3><p style="color:#666;margin-top:8px">Please check your internet connection and reload.</p></div>';
+      });
+  });
+</script>
+</body>
+</html>
