@@ -1,0 +1,38 @@
+- generic [active] [ref=e2]:
+  - generic:
+    - generic:
+      - img
+    - generic [ref=e97]:
+      - generic [ref=e100]:
+        - heading "Barking and Dagenham" [level=3] [ref=e101]
+        - img "A random puppy" [ref=e102]
+        - generic [ref=e103]: "Happiness: 5.8 • Puppies: 18.5%"
+        - button "Another Puppy!" [ref=e104] [cursor=pointer]
+      - button "Close popup" [ref=e106] [cursor=pointer]: ×
+  - generic:
+    - generic [ref=e36]:
+      - button "Zoom in" [ref=e37] [cursor=pointer]: +
+      - button "Zoom out" [ref=e38] [cursor=pointer]: −
+    - generic [ref=e39]:
+      - heading "London Boroughs" [level=4] [ref=e107]
+      - generic [ref=e108]: Happiness × Puppy Index
+      - generic [ref=e109]: Hover over a borough
+    - generic:
+      - generic [ref=e43]:
+        - heading "Happiness × Puppy Index" [level=4] [ref=e44]
+        - generic [ref=e47]: Very High
+        - generic [ref=e50]: High
+        - generic [ref=e53]: Medium
+        - generic [ref=e56]: Low
+        - generic [ref=e59]: Very Low
+      - generic [ref=e60]:
+        - link "Leaflet" [ref=e61] [cursor=pointer]:
+          - /url: https://leafletjs.com
+          - img [ref=e62]
+          - text: Leaflet
+        - text: "| ©"
+        - link "OpenStreetMap" [ref=e66] [cursor=pointer]:
+          - /url: https://www.openstreetmap.org/copyright
+        - text: ©
+        - link "CARTO" [ref=e67] [cursor=pointer]:
+          - /url: https://carto.com/

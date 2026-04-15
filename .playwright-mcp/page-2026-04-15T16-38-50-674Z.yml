@@ -1,0 +1,38 @@
+- generic [active] [ref=e2]:
+  - generic:
+    - generic:
+      - img
+    - generic [ref=e68]:
+      - generic [ref=e71]:
+        - heading "Hammersmith and Fulham" [level=3] [ref=e72]
+        - img "A random puppy" [ref=e73]
+        - generic [ref=e74]: "Happiness: 7.0 • Puppies: 15.4%"
+        - button "Another Puppy!" [ref=e75] [cursor=pointer]
+      - button "Close popup" [ref=e77] [cursor=pointer]: ×
+  - generic:
+    - generic [ref=e3]:
+      - button "Zoom in" [ref=e4] [cursor=pointer]: +
+      - button "Zoom out" [ref=e5] [cursor=pointer]: −
+    - generic [ref=e6]:
+      - heading "London Boroughs" [level=4] [ref=e78]
+      - generic [ref=e79]: Happiness × Puppy Index
+      - generic [ref=e80]: Hover over a borough
+    - generic:
+      - generic [ref=e10]:
+        - heading "Happiness × Puppy Index" [level=4] [ref=e11]
+        - generic [ref=e14]: Very High
+        - generic [ref=e17]: High
+        - generic [ref=e20]: Medium
+        - generic [ref=e23]: Low
+        - generic [ref=e26]: Very Low
+      - generic [ref=e27]:
+        - link "Leaflet" [ref=e28] [cursor=pointer]:
+          - /url: https://leafletjs.com
+          - img [ref=e29]
+          - text: Leaflet
+        - text: "| ©"
+        - link "OpenStreetMap" [ref=e33] [cursor=pointer]:
+          - /url: https://www.openstreetmap.org/copyright
+        - text: ©
+        - link "CARTO" [ref=e34] [cursor=pointer]:
+          - /url: https://carto.com/
