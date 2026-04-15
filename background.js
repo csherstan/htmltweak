@@ -64,9 +64,52 @@ async function executeToolOnTab(tabId, toolName, args) {
       return { content: `CSS injected successfully (${args.css.length} chars)` };
     }
 
-    case 'get_page_html': {
-      const response = await chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_HTML' });
-      return { content: response.html };
+    case 'get_page_structure': {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: 'GET_PAGE_STRUCTURE',
+        maxDepth: args.max_depth,
+        rootSelector: args.root_selector,
+      });
+      return { content: JSON.stringify(response, null, 2) };
+    }
+
+    case 'query_selector': {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: 'QUERY_SELECTOR',
+        selector: args.selector,
+        limit: args.limit,
+      });
+      return { content: JSON.stringify(response, null, 2) };
+    }
+
+    case 'get_element_details': {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: 'GET_ELEMENT_DETAILS',
+        selector: args.selector,
+        includeChildren: args.include_children,
+      });
+      return { content: JSON.stringify(response, null, 2) };
+    }
+
+    case 'search_page_text': {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: 'SEARCH_PAGE_TEXT',
+        query: args.query,
+        regex: args.regex,
+        limit: args.limit,
+      });
+      return { content: JSON.stringify(response, null, 2) };
+    }
+
+    case 'search_page_attributes': {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        type: 'SEARCH_PAGE_ATTRIBUTES',
+        query: args.query,
+        attribute: args.attribute,
+        regex: args.regex,
+        limit: args.limit,
+      });
+      return { content: JSON.stringify(response, null, 2) };
     }
 
     case 'take_screenshot': {
