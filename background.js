@@ -47,36 +47,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Handle full page loads (including reloads) — auto-apply saved rules
 chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (details.frameId !== 0) return; // main frame only
+  console.log('[htmltweak:bg] onCompleted fired for URL:', details.url, 'tabId:', details.tabId);
   const rules = await getMatchingRules(details.url);
+  console.log('[htmltweak:bg] onCompleted matched rules:', rules.length, rules.map(r => ({ id: r.id, urlPattern: r.urlPattern, enabled: r.enabled, cssLen: r.css?.length })));
   if (rules.length > 0) {
     const css = rules.map(r => r.css).join('\n\n');
-    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {
+    console.log('[htmltweak:bg] onCompleted sending AUTO_APPLY, css length:', css.length);
+    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch((err) => {
+      console.log('[htmltweak:bg] onCompleted sendMessage failed, injecting content script:', err.message);
       // Content script not loaded — inject and retry
       chrome.scripting.executeScript({
         target: { tabId: details.tabId },
         files: ['content.js'],
       }).then(() => {
-        chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {});
-      }).catch(() => {});
+        console.log('[htmltweak:bg] onCompleted content script injected, retrying AUTO_APPLY');
+        chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch((err2) => {
+          console.log('[htmltweak:bg] onCompleted retry AUTO_APPLY failed:', err2.message);
+        });
+      }).catch((err2) => {
+        console.log('[htmltweak:bg] onCompleted content script injection failed:', err2.message);
+      });
     });
+  } else {
+    console.log('[htmltweak:bg] onCompleted no matching rules for URL:', details.url);
   }
 });
 
 // Handle SPA navigation — re-apply rules
 chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   if (details.frameId !== 0) return; // main frame only
+  console.log('[htmltweak:bg] onHistoryStateUpdated fired for URL:', details.url, 'tabId:', details.tabId);
   const rules = await getMatchingRules(details.url);
+  console.log('[htmltweak:bg] onHistoryStateUpdated matched rules:', rules.length, rules.map(r => ({ id: r.id, urlPattern: r.urlPattern, enabled: r.enabled, cssLen: r.css?.length })));
   if (rules.length > 0) {
     const css = rules.map(r => r.css).join('\n\n');
-    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {
+    console.log('[htmltweak:bg] onHistoryStateUpdated sending AUTO_APPLY, css length:', css.length);
+    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch((err) => {
+      console.log('[htmltweak:bg] onHistoryStateUpdated sendMessage failed, injecting content script:', err.message);
       // Content script not loaded — inject and retry
       chrome.scripting.executeScript({
         target: { tabId: details.tabId },
         files: ['content.js'],
       }).then(() => {
-        chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {});
-      }).catch(() => {});
+        console.log('[htmltweak:bg] onHistoryStateUpdated content script injected, retrying AUTO_APPLY');
+        chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch((err2) => {
+          console.log('[htmltweak:bg] onHistoryStateUpdated retry AUTO_APPLY failed:', err2.message);
+        });
+      }).catch((err2) => {
+        console.log('[htmltweak:bg] onHistoryStateUpdated content script injection failed:', err2.message);
+      });
     });
+  } else {
+    console.log('[htmltweak:bg] onHistoryStateUpdated no matching rules for URL:', details.url);
   }
 });
 
@@ -180,14 +202,19 @@ async function handleToolExecution(message, sendResponse) {
 
 async function handleGetMatchingRules(message, sendResponse) {
   try {
+    console.log('[htmltweak:bg] handleGetMatchingRules called for URL:', message.url);
     const rules = await getMatchingRules(message.url);
+    console.log('[htmltweak:bg] handleGetMatchingRules matched rules:', rules.length, rules.map(r => ({ id: r.id, urlPattern: r.urlPattern, enabled: r.enabled, cssLen: r.css?.length })));
     if (rules.length > 0) {
       const css = rules.map(r => r.css).join('\n\n');
+      console.log('[htmltweak:bg] handleGetMatchingRules responding with css length:', css.length);
       sendResponse({ css });
     } else {
+      console.log('[htmltweak:bg] handleGetMatchingRules no matching rules, responding with null');
       sendResponse({ css: null });
     }
   } catch (error) {
+    console.log('[htmltweak:bg] handleGetMatchingRules error:', error.message);
     sendResponse({ css: null });
   }
 }

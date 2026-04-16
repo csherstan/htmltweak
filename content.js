@@ -351,9 +351,11 @@
 
       case 'AUTO_APPLY':
         if (message.css) {
+          console.log('[htmltweak:content] AUTO_APPLY received, css length:', message.css.length, 'preview:', message.css.substring(0, 100));
           injectCSS(message.css);
           sendResponse({ success: true });
         } else {
+          console.log('[htmltweak:content] AUTO_APPLY received but no css in message');
           sendResponse({ success: false });
         }
         break;
@@ -365,12 +367,18 @@
   });
 
   // Request auto-apply rules on load
+  console.log('[htmltweak:content] content script loaded, requesting matching rules for URL:', window.location.href);
   chrome.runtime.sendMessage({
     type: 'GET_MATCHING_RULES',
     url: window.location.href,
   }, (response) => {
-    if (chrome.runtime.lastError) return; // extension context invalidated
+    if (chrome.runtime.lastError) {
+      console.log('[htmltweak:content] GET_MATCHING_RULES error:', chrome.runtime.lastError.message);
+      return; // extension context invalidated
+    }
+    console.log('[htmltweak:content] GET_MATCHING_RULES response:', response ? { hasCss: !!response.css, cssLen: response.css?.length } : 'null');
     if (response && response.css) {
+      console.log('[htmltweak:content] injecting css from GET_MATCHING_RULES, preview:', response.css.substring(0, 100));
       injectCSS(response.css);
     }
   });
