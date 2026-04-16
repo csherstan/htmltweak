@@ -6,6 +6,10 @@ import { getSettings, getMatchingRules } from './lib/storage.js';
 // Chrome opens the side panel on action click; we bind per-tab via setOptions
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+// Per-tab accumulated CSS from inject_css calls during a conversation.
+// Each entry is an array of CSS strings; combined CSS is sent to the content script.
+const tabCssState = new Map();
+
 // Send message to tab, auto-injecting content script if not loaded
 async function sendTabMessage(tabId, message) {
   try {
@@ -48,6 +52,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log(`[htmltweak:bg] onMessage unknown type=${message.type}`);
       return false;
   }
+});
+
+// Clean up CSS state when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabCssState.delete(tabId);
+});
+
+// Reset accumulated CSS state on full page navigation (user navigated away)
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  tabCssState.delete(details.tabId);
 });
 
 // Handle full page loads (including reloads) — auto-apply saved rules
@@ -127,9 +142,20 @@ async function executeToolOnTab(tabId, toolName, args) {
   console.log(`[htmltweak:bg] executeToolOnTab tab=${tabId} tool=${toolName} args=${JSON.stringify(args).slice(0, 200)}`);
   switch (toolName) {
     case 'inject_css': {
-      await sendTabMessage(tabId, { type: 'INJECT_CSS', css: args.css });
-      console.log(`[htmltweak:bg] inject_css complete, ${args.css.length} chars`);
-      return { content: `CSS injected successfully (${args.css.length} chars)` };
+      if (args.replace) {
+        // Explicit replace: wipe accumulated state and use only the new CSS
+        tabCssState.set(tabId, [args.css]);
+        console.log(`[htmltweak:bg] inject_css replace mode, wiped prior state`);
+      } else {
+        // Accumulate: append new CSS to existing state
+        const existing = tabCssState.get(tabId) || [];
+        existing.push(args.css);
+        tabCssState.set(tabId, existing);
+      }
+      const combined = tabCssState.get(tabId).join('\n\n');
+      await sendTabMessage(tabId, { type: 'INJECT_CSS', css: combined });
+      console.log(`[htmltweak:bg] inject_css complete, ${args.css.length} new chars, ${combined.length} total chars`);
+      return { content: `CSS injected successfully (${args.css.length} new chars, ${combined.length} total accumulated chars)` };
     }
 
     case 'get_page_structure': {

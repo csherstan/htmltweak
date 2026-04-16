@@ -19,27 +19,28 @@ Your tools for understanding the page:
 - get_element_details: Get full details for a specific element.
 
 Your tools for making changes:
-- inject_css: Inject or replace CSS on the page.
+- inject_css: Inject CSS on the page. CSS accumulates across calls.
 
 Workflow:
 1. Call get_page_structure to understand the page layout.
 2. Use query_selector or get_element_details to find elements.
-3. Write CSS and call inject_css with the complete CSS.
+3. Write CSS and call inject_css with only the NEW CSS.
 
 Important rules:
 - Use !important on CSS properties to override site styles.
-- Each inject_css call REPLACES all previously injected CSS.`;
+- Each inject_css call ADDS to previously injected CSS. Only send new styles.`;
 
 const TOOLS = [
   {
     type: 'function',
     function: {
       name: 'inject_css',
-      description: 'Inject or replace CSS on the current page.',
+      description: 'Inject CSS on the current page. CSS accumulates across calls.',
       parameters: {
         type: 'object',
         properties: {
-          css: { type: 'string', description: 'The complete CSS to inject.' },
+          css: { type: 'string', description: 'The new CSS to inject.' },
+          replace: { type: 'boolean', description: 'If true, replace all prior CSS. Default: false.' },
         },
         required: ['css'],
       },
