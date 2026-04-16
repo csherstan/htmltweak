@@ -44,6 +44,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Handle full page loads (including reloads) — auto-apply saved rules
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (details.frameId !== 0) return; // main frame only
+  const rules = await getMatchingRules(details.url);
+  if (rules.length > 0) {
+    const css = rules.map(r => r.css).join('\n\n');
+    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {
+      // Content script not loaded — inject and retry
+      chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        files: ['content.js'],
+      }).then(() => {
+        chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {});
+      }).catch(() => {});
+    });
+  }
+});
+
 // Handle SPA navigation — re-apply rules
 chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   if (details.frameId !== 0) return; // main frame only
