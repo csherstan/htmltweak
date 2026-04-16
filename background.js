@@ -3,13 +3,32 @@
 import { runConversation } from './lib/llm.js';
 import { getSettings, getMatchingRules } from './lib/storage.js';
 
-// Open side panel on action click
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ tabId: tab.id });
+// Disable global side panel — we bind per-tab
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+
+// Open side panel bound to the specific tab on action click
+chrome.action.onClicked.addListener(async (tab) => {
+  await chrome.sidePanel.setOptions({
+    tabId: tab.id,
+    path: 'sidepanel/sidepanel.html',
+    enabled: true,
+  });
+  await chrome.sidePanel.open({ tabId: tab.id });
 });
 
-// Enable side panel for all tabs
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+// Send message to tab, auto-injecting content script if not loaded
+async function sendTabMessage(tabId, message) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (e) {
+    // Content script not loaded — inject it and retry
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js'],
+    });
+    return await chrome.tabs.sendMessage(tabId, message);
+  }
+}
 
 // Handle messages from side panel and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -41,7 +60,15 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   const rules = await getMatchingRules(details.url);
   if (rules.length > 0) {
     const css = rules.map(r => r.css).join('\n\n');
-    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {});
+    chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {
+      // Content script not loaded — inject and retry
+      chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        files: ['content.js'],
+      }).then(() => {
+        chrome.tabs.sendMessage(details.tabId, { type: 'AUTO_APPLY', css }).catch(() => {});
+      }).catch(() => {});
+    });
   }
 });
 
@@ -60,12 +87,12 @@ async function handleChat(message, sendResponse) {
 async function executeToolOnTab(tabId, toolName, args) {
   switch (toolName) {
     case 'inject_css': {
-      await chrome.tabs.sendMessage(tabId, { type: 'INJECT_CSS', css: args.css });
+      await sendTabMessage(tabId, { type: 'INJECT_CSS', css: args.css });
       return { content: `CSS injected successfully (${args.css.length} chars)` };
     }
 
     case 'get_page_structure': {
-      const response = await chrome.tabs.sendMessage(tabId, {
+      const response = await sendTabMessage(tabId, {
         type: 'GET_PAGE_STRUCTURE',
         maxDepth: args.max_depth,
         rootSelector: args.root_selector,
@@ -74,7 +101,7 @@ async function executeToolOnTab(tabId, toolName, args) {
     }
 
     case 'query_selector': {
-      const response = await chrome.tabs.sendMessage(tabId, {
+      const response = await sendTabMessage(tabId, {
         type: 'QUERY_SELECTOR',
         selector: args.selector,
         limit: args.limit,
@@ -83,7 +110,7 @@ async function executeToolOnTab(tabId, toolName, args) {
     }
 
     case 'get_element_details': {
-      const response = await chrome.tabs.sendMessage(tabId, {
+      const response = await sendTabMessage(tabId, {
         type: 'GET_ELEMENT_DETAILS',
         selector: args.selector,
         includeChildren: args.include_children,
@@ -92,7 +119,7 @@ async function executeToolOnTab(tabId, toolName, args) {
     }
 
     case 'search_page_text': {
-      const response = await chrome.tabs.sendMessage(tabId, {
+      const response = await sendTabMessage(tabId, {
         type: 'SEARCH_PAGE_TEXT',
         query: args.query,
         regex: args.regex,
@@ -102,7 +129,7 @@ async function executeToolOnTab(tabId, toolName, args) {
     }
 
     case 'search_page_attributes': {
-      const response = await chrome.tabs.sendMessage(tabId, {
+      const response = await sendTabMessage(tabId, {
         type: 'SEARCH_PAGE_ATTRIBUTES',
         query: args.query,
         attribute: args.attribute,
@@ -161,7 +188,7 @@ async function handleGetCurrentCSS(sendResponse) {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) {
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_CSS' });
+      const response = await sendTabMessage(tab.id, { type: 'GET_CSS' });
       sendResponse({ css: response.css });
     } else {
       sendResponse({ css: '' });

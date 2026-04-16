@@ -108,7 +108,8 @@ async function updateSaveButton() {
   try {
     const tabId = await getActiveTabId();
     if (!tabId) return;
-    const response = await chrome.tabs.sendMessage(tabId, { type: 'GET_CSS' });
+    // Use runtime message to background to get CSS (avoids direct tab messaging issues)
+    const response = await chrome.runtime.sendMessage({ type: 'GET_CURRENT_CSS' });
     currentCSS = response.css || '';
     saveRuleBtn.disabled = !currentCSS;
   } catch {
