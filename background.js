@@ -3,18 +3,8 @@
 import { runConversation } from './lib/llm.js';
 import { getSettings, getMatchingRules } from './lib/storage.js';
 
-// Disable global side panel — we bind per-tab
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-
-// Open side panel bound to the specific tab on action click
-chrome.action.onClicked.addListener(async (tab) => {
-  await chrome.sidePanel.setOptions({
-    tabId: tab.id,
-    path: 'sidepanel/sidepanel.html',
-    enabled: true,
-  });
-  await chrome.sidePanel.open({ tabId: tab.id });
-});
+// Chrome opens the side panel on action click; we bind per-tab via setOptions
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Send message to tab, auto-injecting content script if not loaded
 async function sendTabMessage(tabId, message) {
@@ -150,10 +140,10 @@ async function executeToolOnTab(tabId, toolName, args) {
           quality: 60,
         });
         const base64Jpeg = dataUrlJpeg.replace('data:image/jpeg;base64,', '');
-        return { base64Image: base64Jpeg, content: 'Screenshot captured (compressed).' };
+        return { base64Image: base64Jpeg, mediaType: 'image/jpeg', content: 'Screenshot captured (compressed).' };
       }
 
-      return { base64Image: base64, content: 'Screenshot captured.' };
+      return { base64Image: base64, mediaType: 'image/png', content: 'Screenshot captured.' };
     }
 
     default:
