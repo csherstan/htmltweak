@@ -179,6 +179,10 @@ savePattern.addEventListener('keydown', (e) => {
   }
 });
 
+// Display version from manifest
+const manifest = chrome.runtime.getManifest();
+document.getElementById('version-number').textContent = manifest.version;
+
 // Initial state check
 console.log('[htmltweak:sidepanel] initialized');
 updateSaveButton();
