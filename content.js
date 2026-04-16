@@ -314,38 +314,49 @@
 
   // Listen for messages from background
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log(`[htmltweak:content] onMessage type=${message.type}`);
     switch (message.type) {
       case 'INJECT_CSS':
+        console.log(`[htmltweak:content] INJECT_CSS length=${message.css?.length}`);
         injectCSS(message.css);
         sendResponse({ success: true });
         break;
 
       case 'REMOVE_CSS':
+        console.log('[htmltweak:content] REMOVE_CSS');
         removeCSS();
         sendResponse({ success: true });
         break;
 
-      case 'GET_CSS':
-        sendResponse({ css: getCurrentCSS() });
+      case 'GET_CSS': {
+        const css = getCurrentCSS();
+        console.log(`[htmltweak:content] GET_CSS length=${css.length}`);
+        sendResponse({ css });
         break;
+      }
 
       case 'GET_PAGE_STRUCTURE':
+        console.log(`[htmltweak:content] GET_PAGE_STRUCTURE maxDepth=${message.maxDepth} rootSelector=${message.rootSelector}`);
         sendResponse(getPageStructure(message.maxDepth, message.rootSelector));
         break;
 
       case 'QUERY_SELECTOR':
+        console.log(`[htmltweak:content] QUERY_SELECTOR selector=${message.selector} limit=${message.limit}`);
         sendResponse(querySelector(message.selector, message.limit));
         break;
 
       case 'GET_ELEMENT_DETAILS':
+        console.log(`[htmltweak:content] GET_ELEMENT_DETAILS selector=${message.selector}`);
         sendResponse(getElementDetails(message.selector, message.includeChildren));
         break;
 
       case 'SEARCH_PAGE_TEXT':
+        console.log(`[htmltweak:content] SEARCH_PAGE_TEXT query=${message.query} regex=${message.regex}`);
         sendResponse(searchPageText(message.query, message.regex, message.limit));
         break;
 
       case 'SEARCH_PAGE_ATTRIBUTES':
+        console.log(`[htmltweak:content] SEARCH_PAGE_ATTRIBUTES query=${message.query} attribute=${message.attribute}`);
         sendResponse(searchPageAttributes(message.query, message.attribute, message.regex, message.limit));
         break;
 
@@ -361,6 +372,7 @@
         break;
 
       default:
+        console.log(`[htmltweak:content] onMessage unknown type=${message.type}`);
         sendResponse({ error: 'Unknown message type' });
     }
     return true; // keep channel open for async response

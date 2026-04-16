@@ -60,6 +60,7 @@ async function sendMessage() {
 
   addMessageBubble('user', text);
   chatMessages.push({ role: 'user', content: text });
+  console.log(`[htmltweak:sidepanel] sendMessage: "${text.slice(0, 100)}" (${chatMessages.length} messages in history)`);
 
   const loadingEl = addMessageBubble('assistant', 'Thinking');
   loadingEl.classList.add('loading-dots');
@@ -70,6 +71,7 @@ async function sendMessage() {
 
     // Check if the tab is a chrome:// or extension page
     const url = await getActiveTabUrl();
+    console.log(`[htmltweak:sidepanel] sendMessage targeting tab=${tabId} url=${url.slice(0, 100)}`);
     if (url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
       throw new Error('PageTweaker cannot modify Chrome internal pages (chrome:// URLs).');
     }
@@ -87,6 +89,7 @@ async function sendMessage() {
     }
 
     const assistantText = response.result.content;
+    console.log(`[htmltweak:sidepanel] sendMessage response: "${assistantText?.slice(0, 200)}"`);
     addMessageBubble('assistant', assistantText);
     chatMessages.push({ role: 'assistant', content: assistantText });
 
@@ -95,6 +98,7 @@ async function sendMessage() {
 
   } catch (error) {
     loadingEl.remove();
+    console.error(`[htmltweak:sidepanel] sendMessage error:`, error.message);
     addMessageBubble('error', `Error: ${error.message}`);
   } finally {
     isProcessing = false;
@@ -111,6 +115,7 @@ async function updateSaveButton() {
     // Use runtime message to background to get CSS (avoids direct tab messaging issues)
     const response = await chrome.runtime.sendMessage({ type: 'GET_CURRENT_CSS' });
     currentCSS = response.css || '';
+    console.log(`[htmltweak:sidepanel] updateSaveButton css length=${currentCSS.length}`);
     saveRuleBtn.disabled = !currentCSS;
   } catch {
     saveRuleBtn.disabled = true;
@@ -131,6 +136,7 @@ async function confirmSaveRule() {
   if (!pattern || !currentCSS) return;
 
   try {
+    console.log(`[htmltweak:sidepanel] confirmSaveRule pattern="${pattern}" css length=${currentCSS.length}`);
     await saveRule({
       urlPattern: pattern,
       css: currentCSS,
@@ -138,6 +144,7 @@ async function confirmSaveRule() {
     saveBar.classList.add('hidden');
     addMessageBubble('tool-indicator', `Rule saved for pattern: ${pattern}`);
   } catch (error) {
+    console.error(`[htmltweak:sidepanel] confirmSaveRule error:`, error.message);
     addMessageBubble('error', `Failed to save rule: ${error.message}`);
   }
 }
@@ -173,4 +180,5 @@ savePattern.addEventListener('keydown', (e) => {
 });
 
 // Initial state check
+console.log('[htmltweak:sidepanel] initialized');
 updateSaveButton();

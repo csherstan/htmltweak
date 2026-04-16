@@ -9,19 +9,24 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 // Send message to tab, auto-injecting content script if not loaded
 async function sendTabMessage(tabId, message) {
   try {
+    console.log(`[htmltweak:bg] sendTabMessage tab=${tabId} type=${message.type}`);
     return await chrome.tabs.sendMessage(tabId, message);
   } catch (e) {
     // Content script not loaded — inject it and retry
+    console.log(`[htmltweak:bg] sendTabMessage tab=${tabId} failed (${e.message}), injecting content script`);
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js'],
     });
+    console.log(`[htmltweak:bg] sendTabMessage tab=${tabId} content script injected, retrying`);
     return await chrome.tabs.sendMessage(tabId, message);
   }
 }
 
 // Handle messages from side panel and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const src = sender.tab ? `tab=${sender.tab.id}` : (sender.url?.includes('sidepanel') ? 'sidepanel' : 'extension');
+  console.log(`[htmltweak:bg] onMessage type=${message.type} from=${src}`);
   switch (message.type) {
     case 'CHAT':
       handleChat(message, sendResponse);
@@ -40,6 +45,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true; // async
 
     default:
+      console.log(`[htmltweak:bg] onMessage unknown type=${message.type}`);
       return false;
   }
 });
@@ -105,19 +111,24 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
 async function handleChat(message, sendResponse) {
   try {
     const settings = await getSettings();
+    console.log(`[htmltweak:bg] handleChat provider=${settings.provider} model=${settings.model} messages=${message.messages.length} tabId=${message.tabId}`);
     const result = await runConversation(settings, message.messages, async (toolName, args) => {
       return executeToolOnTab(message.tabId, toolName, args);
     });
+    console.log(`[htmltweak:bg] handleChat complete, result type=${result.type}`);
     sendResponse({ success: true, result });
   } catch (error) {
+    console.error(`[htmltweak:bg] handleChat error:`, error.message);
     sendResponse({ success: false, error: error.message });
   }
 }
 
 async function executeToolOnTab(tabId, toolName, args) {
+  console.log(`[htmltweak:bg] executeToolOnTab tab=${tabId} tool=${toolName} args=${JSON.stringify(args).slice(0, 200)}`);
   switch (toolName) {
     case 'inject_css': {
       await sendTabMessage(tabId, { type: 'INJECT_CSS', css: args.css });
+      console.log(`[htmltweak:bg] inject_css complete, ${args.css.length} chars`);
       return { content: `CSS injected successfully (${args.css.length} chars)` };
     }
 
@@ -170,11 +181,14 @@ async function executeToolOnTab(tabId, toolName, args) {
     }
 
     case 'take_screenshot': {
+      console.log(`[htmltweak:bg] take_screenshot capturing tab`);
       const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
       const base64 = dataUrl.replace('data:image/png;base64,', '');
+      console.log(`[htmltweak:bg] take_screenshot captured, base64 length=${base64.length}`);
 
       // Resize if too large (> 1MB base64)
       if (base64.length > 1_000_000) {
+        console.log(`[htmltweak:bg] take_screenshot compressing to jpeg (base64 > 1MB)`);
         const dataUrlJpeg = await chrome.tabs.captureVisibleTab(null, {
           format: 'jpeg',
           quality: 60,
@@ -187,15 +201,18 @@ async function executeToolOnTab(tabId, toolName, args) {
     }
 
     default:
+      console.warn(`[htmltweak:bg] executeToolOnTab unknown tool: ${toolName}`);
       return { content: `Unknown tool: ${toolName}` };
   }
 }
 
 async function handleToolExecution(message, sendResponse) {
   try {
+    console.log(`[htmltweak:bg] handleToolExecution tool=${message.toolName} tab=${message.tabId}`);
     const result = await executeToolOnTab(message.tabId, message.toolName, message.args);
     sendResponse({ success: true, result });
   } catch (error) {
+    console.error(`[htmltweak:bg] handleToolExecution error:`, error.message);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -222,13 +239,16 @@ async function handleGetMatchingRules(message, sendResponse) {
 async function handleGetCurrentCSS(sendResponse) {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    console.log(`[htmltweak:bg] handleGetCurrentCSS activeTab=${tab?.id || 'none'}`);
     if (tab) {
       const response = await sendTabMessage(tab.id, { type: 'GET_CSS' });
+      console.log(`[htmltweak:bg] handleGetCurrentCSS got css length=${response.css?.length || 0}`);
       sendResponse({ css: response.css });
     } else {
       sendResponse({ css: '' });
     }
   } catch (error) {
+    console.error(`[htmltweak:bg] handleGetCurrentCSS error:`, error.message);
     sendResponse({ css: '' });
   }
 }
