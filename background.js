@@ -8,7 +8,27 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Per-tab structured CSS state from inject_css calls during a conversation.
 // Each entry is an array of { description, css } objects; combined CSS is sent to the content script.
+// Backed by chrome.storage.session so state survives MV3 service worker restarts.
 const tabCssState = new Map();
+
+// Restore CSS state from chrome.storage.session on service worker startup
+chrome.storage.session.get(null, (items) => {
+  for (const [key, value] of Object.entries(items)) {
+    if (key.startsWith('cssState_')) {
+      const tabId = parseInt(key.slice('cssState_'.length), 10);
+      tabCssState.set(tabId, value);
+    }
+  }
+});
+
+function persistCssState(tabId, changes) {
+  const key = `cssState_${tabId}`;
+  if (changes.length === 0) {
+    chrome.storage.session.remove(key);
+  } else {
+    chrome.storage.session.set({ [key]: changes });
+  }
+}
 
 // Send message to tab, auto-injecting content script if not loaded
 async function sendTabMessage(tabId, message) {
@@ -57,12 +77,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Clean up CSS state when tabs are closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabCssState.delete(tabId);
+  chrome.storage.session.remove(`cssState_${tabId}`);
 });
 
 // Reset accumulated CSS state on full page navigation (user navigated away)
 chrome.webNavigation.onCommitted.addListener((details) => {
   if (details.frameId !== 0) return;
   tabCssState.delete(details.tabId);
+  chrome.storage.session.remove(`cssState_${details.tabId}`);
 });
 
 // Handle full page loads (including reloads) — auto-apply saved rules
@@ -163,6 +185,7 @@ async function executeToolOnTab(tabId, toolName, args) {
           return { content: `Error: unknown action "${args.action}"` };
       }
       tabCssState.set(tabId, changes);
+      persistCssState(tabId, changes);
       const combined = changes.map(c => c.css).join('\n\n');
       if (combined) {
         await sendTabMessage(tabId, { type: 'INJECT_CSS', css: combined });
