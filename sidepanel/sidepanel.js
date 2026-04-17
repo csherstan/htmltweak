@@ -43,6 +43,7 @@ function addMessageBubble(role, content) {
 function addToolIndicator(toolName) {
   const labels = {
     inject_css: 'Injecting CSS...',
+    get_injected_css: 'Checking CSS state...',
     get_page_html: 'Reading page structure...',
     take_screenshot: 'Taking screenshot...',
   };

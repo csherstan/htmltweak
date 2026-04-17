@@ -6,8 +6,8 @@ import { getSettings, getMatchingRules } from './lib/storage.js';
 // Chrome opens the side panel on action click; we bind per-tab via setOptions
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-// Per-tab accumulated CSS from inject_css calls during a conversation.
-// Each entry is an array of CSS strings; combined CSS is sent to the content script.
+// Per-tab structured CSS state from inject_css calls during a conversation.
+// Each entry is an array of { description, css } objects; combined CSS is sent to the content script.
 const tabCssState = new Map();
 
 // Send message to tab, auto-injecting content script if not loaded
@@ -142,20 +142,45 @@ async function executeToolOnTab(tabId, toolName, args) {
   console.log(`[htmltweak:bg] executeToolOnTab tab=${tabId} tool=${toolName} args=${JSON.stringify(args).slice(0, 200)}`);
   switch (toolName) {
     case 'inject_css': {
-      if (args.replace) {
-        // Explicit replace: wipe accumulated state and use only the new CSS
-        tabCssState.set(tabId, [args.css]);
-        console.log(`[htmltweak:bg] inject_css replace mode, wiped prior state`);
-      } else {
-        // Accumulate: append new CSS to existing state
-        const existing = tabCssState.get(tabId) || [];
-        existing.push(args.css);
-        tabCssState.set(tabId, existing);
+      const changes = tabCssState.get(tabId) || [];
+      switch (args.action) {
+        case 'add':
+          changes.push({ description: args.description, css: args.css });
+          break;
+        case 'remove':
+          if (args.index < 0 || args.index >= changes.length) {
+            return { content: `Error: index ${args.index} out of range (0-${changes.length - 1})` };
+          }
+          changes.splice(args.index, 1);
+          break;
+        case 'replace':
+          if (args.index < 0 || args.index >= changes.length) {
+            return { content: `Error: index ${args.index} out of range (0-${changes.length - 1})` };
+          }
+          changes[args.index] = { description: args.description, css: args.css };
+          break;
+        default:
+          return { content: `Error: unknown action "${args.action}"` };
       }
-      const combined = tabCssState.get(tabId).join('\n\n');
-      await sendTabMessage(tabId, { type: 'INJECT_CSS', css: combined });
-      console.log(`[htmltweak:bg] inject_css complete, ${args.css.length} new chars, ${combined.length} total chars`);
-      return { content: `CSS injected successfully (${args.css.length} new chars, ${combined.length} total accumulated chars)` };
+      tabCssState.set(tabId, changes);
+      const combined = changes.map(c => c.css).join('\n\n');
+      if (combined) {
+        await sendTabMessage(tabId, { type: 'INJECT_CSS', css: combined });
+      } else {
+        await sendTabMessage(tabId, { type: 'REMOVE_CSS' });
+      }
+      console.log(`[htmltweak:bg] inject_css action=${args.action}, ${changes.length} changes, ${combined.length} total chars`);
+      return { content: `CSS ${args.action} successful (${changes.length} changes, ${combined.length} total chars)` };
+    }
+
+    case 'get_injected_css': {
+      const changes = tabCssState.get(tabId) || [];
+      const state = {
+        changes: changes.map((c, i) => ({ index: i, description: c.description, css: c.css })),
+        combined: changes.map(c => c.css).join('\n\n'),
+      };
+      console.log(`[htmltweak:bg] get_injected_css: ${changes.length} changes`);
+      return { content: JSON.stringify(state, null, 2) };
     }
 
     case 'get_page_structure': {
