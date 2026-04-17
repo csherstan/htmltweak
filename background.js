@@ -226,6 +226,21 @@ async function executeToolOnTab(tabId, toolName, args) {
       return { base64Image: base64, mediaType: 'image/png', content: 'Screenshot captured.' };
     }
 
+    case 'reply': {
+      // reply is handled in the LLM loop — just acknowledge here
+      console.log(`[htmltweak:bg] reply tool called: ${(args.text || '').slice(0, 200)}`);
+      return { content: 'Reply delivered.' };
+    }
+
+    case 'status_update': {
+      // Send status update to sidepanel for live display
+      console.log(`[htmltweak:bg] status_update: ${(args.text || '').slice(0, 200)}`);
+      chrome.runtime.sendMessage({ type: 'STATUS_UPDATE', text: args.text }).catch(() => {
+        // Sidepanel may not be listening — that's fine
+      });
+      return { content: 'Status update sent.' };
+    }
+
     default:
       console.warn(`[htmltweak:bg] executeToolOnTab unknown tool: ${toolName}`);
       return { content: `Unknown tool: ${toolName}` };

@@ -179,6 +179,14 @@ savePattern.addEventListener('keydown', (e) => {
   }
 });
 
+// Listen for status updates from background (live progress during agent loop)
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'STATUS_UPDATE' && message.text) {
+    console.log(`[htmltweak:sidepanel] status_update: ${message.text.slice(0, 200)}`);
+    addMessageBubble('tool-indicator', message.text);
+  }
+});
+
 // Display version from manifest
 const manifest = chrome.runtime.getManifest();
 document.getElementById('version-number').textContent = manifest.version;
